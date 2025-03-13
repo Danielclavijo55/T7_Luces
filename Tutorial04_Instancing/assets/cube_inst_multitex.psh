@@ -1,0 +1,46 @@
+Texture2D    g_Texture;        // Textura principal (DGLogo)
+Texture2D    g_TextureDetail;  // Textura de detalle (BrickWall)
+Texture2D    g_TextureBlend;   // Textura de mezcla/control (BlendMap)
+Texture2D    g_TextureAlt;     // Textura alternativa (MetalPlate)
+
+SamplerState g_Texture_sampler; // Sampler para todas las texturas
+
+cbuffer PSConstants
+{
+    float g_BlendFactor;
+};
+
+struct PSInput
+{
+    float4 Pos          : SV_POSITION;
+    float2 UV           : TEX_COORD;
+    float  TexSelector  : TEXCOORD1;
+};
+
+struct PSOutput
+{
+    float4 Color : SV_TARGET;
+};
+
+void main(in PSInput PSIn, out PSOutput PSOut)
+{
+    // Obtener colores de las texturas
+    float4 color1 = g_Texture.Sample(g_Texture_sampler, PSIn.UV);
+    float4 color2 = g_TextureDetail.Sample(g_Texture_sampler, PSIn.UV);
+    float4 color3 = g_TextureBlend.Sample(g_Texture_sampler, PSIn.UV);
+    float4 color4 = g_TextureAlt.Sample(g_Texture_sampler, PSIn.UV);
+
+    // Seleccionar mezcla basada en TexSelector
+    float4 Color;
+    if (PSIn.TexSelector < 0.5)
+        Color = lerp(color1, color2, g_BlendFactor); // Mezcla DGLogo-BrickWall
+    else if (PSIn.TexSelector < 1.5)
+        Color = lerp(color1, color3, g_BlendFactor); // Mezcla DGLogo-BlendMap
+    else
+        Color = lerp(color1, color4, g_BlendFactor); // Mezcla DGLogo-MetalPlate
+
+#if CONVERT_PS_OUTPUT_TO_GAMMA
+    Color.rgb = pow(Color.rgb, float3(1.0 / 2.2, 1.0 / 2.2, 1.0 / 2.2));
+#endif
+    PSOut.Color = Color;
+}

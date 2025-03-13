@@ -1,0 +1,35 @@
+Texture2D g_FloorTexture;
+SamplerState g_Texture_sampler;
+
+struct PSInput
+{
+    float4 Pos     : SV_POSITION;
+    float2 UV      : TEX_COORD;
+    float3 Normal  : NORMAL;
+};
+
+float4 main(in PSInput PSIn) : SV_Target
+{
+    // Crear un patrón de tablero de ajedrez procedural
+    float2 checkPos = floor(PSIn.UV * 10.0); // Multiplicar por 10 para tener 10x10 cuadros
+    float checker = fmod(checkPos.x + checkPos.y, 2.0); // Alternancia de casillas
+    
+    // Color para casillas claras y oscuras
+    float3 lightSquare = float3(0.8, 0.8, 0.8); // Gris claro
+    float3 darkSquare = float3(0.3, 0.3, 0.3);  // Gris oscuro
+    
+    // Interpolar entre colores de casillas
+    float3 checkerColor = lerp(darkSquare, lightSquare, checker);
+    
+    // Agregar una iluminación simple fija
+    float3 normal = normalize(PSIn.Normal);
+    float3 lightDir = normalize(float3(-0.577, -0.577, -0.577)); // Dirección de luz fija
+    
+    // Calcular factor difuso
+    float diffuseFactor = max(dot(normal, lightDir), 0.2); // 0.2 es un valor ambiente fijo
+    
+    // Color final
+    float3 finalColor = checkerColor * diffuseFactor;
+    
+    return float4(finalColor, 1.0);
+}

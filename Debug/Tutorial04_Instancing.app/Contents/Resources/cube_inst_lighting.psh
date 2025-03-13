@@ -1,0 +1,68 @@
+Texture2D g_Texture;        // Textura principal (DGLogo)
+Texture2D g_TextureDetail;  // Textura de detalle (BrickWall)
+Texture2D g_TextureBlend;   // Textura de mezcla (BlendMap)
+Texture2D g_TextureAlt;     // Textura alternativa (MetalPlate)
+SamplerState g_Texture_sampler;   // Sampler para texturas
+
+cbuffer PSConstants
+{
+    float  g_BlendFactor;           // Factor de mezcla entre texturas
+    float4 g_LightDir;              // Dirección de la luz
+    float4 g_LightColor;            // Color de la luz
+    float4 g_AmbientColor;          // Color ambiental
+    float4 g_CameraPos;             // Posición de la cámara
+    float  g_SpecularPower;         // Exponente especular
+    float  g_SpecularIntensity;     // Intensidad especular
+};
+
+struct PSInput
+{
+    float4 Pos          : SV_POSITION;
+    float2 UV           : TEX_COORD;
+    float  TexSelector  : TEXCOORD1;
+    float3 Normal       : NORMAL;
+    float3 WorldPos     : TEXCOORD2;
+};
+
+float4 main(in PSInput PSIn) : SV_Target
+{
+    // Obtener colores de las texturas
+    float4 color1 = g_Texture.Sample(g_Texture_sampler, PSIn.UV);
+    float4 color2 = g_TextureDetail.Sample(g_Texture_sampler, PSIn.UV);
+    float4 color3 = g_TextureBlend.Sample(g_Texture_sampler, PSIn.UV);
+    float4 color4 = g_TextureAlt.Sample(g_Texture_sampler, PSIn.UV);
+
+    // Seleccionar mezcla basada en TexSelector
+    float4 baseColor;
+    if (PSIn.TexSelector < 0.5)
+        baseColor = lerp(color1, color2, g_BlendFactor);
+    else if (PSIn.TexSelector < 1.5)
+        baseColor = lerp(color1, color3, g_BlendFactor);
+    else
+        baseColor = lerp(color1, color4, g_BlendFactor);
+    
+    // Normalizar la normal después de la interpolación
+    float3 normal = normalize(PSIn.Normal);
+    
+    // Calcular iluminación
+    float3 lightDir = normalize(-g_LightDir.xyz);
+    
+    // Componente ambiental
+    float3 ambient = g_AmbientColor.rgb * baseColor.rgb;
+    
+    // Componente difusa (Lambert)
+    float NdotL = max(dot(normal, lightDir), 0.0);
+    float3 diffuse = g_LightColor.rgb * baseColor.rgb * NdotL;
+    
+    // Componente especular (Blinn-Phong)
+    float3 viewDir = normalize(g_CameraPos.xyz - PSIn.WorldPos);
+    float3 halfVec = normalize(lightDir + viewDir);
+    float NdotH = max(dot(normal, halfVec), 0.0);
+    float specularFactor = pow(NdotH, g_SpecularPower) * g_SpecularIntensity;
+    float3 specular = g_LightColor.rgb * specularFactor;
+    
+    // Color final combinando todas las componentes
+    float3 finalColor = ambient + diffuse + specular;
+    
+    return float4(finalColor, baseColor.a);
+}
